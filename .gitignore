@@ -1,6 +1,9 @@
 # Generated SQLite database (recreate with: python load_data.py)
 *.db
 
+# Generated analysis output (recreate with: python analysis.py)
+cell_frequencies.csv
+
 # Claude Code local files
 .claude/
 
