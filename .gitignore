@@ -1,0 +1,11 @@
+# Generated SQLite database (recreate with: python load_data.py)
+*.db
+
+# Claude Code local files
+.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
