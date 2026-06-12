@@ -175,6 +175,67 @@ def responder_boxplot(freq_df, outpath="responder_boxplot.png", ax=None):
     return ax
 
 
+# ---------------------------------------------------------------------------
+# Part 4 - Data subset analysis: baseline melanoma/miraclib PBMC samples
+# ---------------------------------------------------------------------------
+def baseline_subset(conn=None, db_path=DB_PATH, condition="melanoma",
+                    treatment="miraclib", sample_type="PBMC", timepoint=0):
+    """Return the baseline subset as one row per sample with subject metadata.
+
+    Default filter: melanoma PBMC samples at baseline
+    (time_from_treatment_start = 0) from miraclib-treated patients.
+    Columns: sample, subject, project, response, sex, age.
+    """
+    close = conn is None
+    conn = conn or connect(db_path)
+    try:
+        query = """
+            SELECT s.sample, su.subject, su.project,
+                   su.response, su.sex, su.age
+            FROM samples  s
+            JOIN subjects su ON s.subject = su.subject
+            WHERE su.condition  = ?
+              AND su.treatment  = ?
+              AND s.sample_type = ?
+              AND s.time_from_treatment_start = ?
+            ORDER BY s.sample
+        """
+        df = pd.read_sql_query(
+            query, conn, params=(condition, treatment, sample_type, timepoint)
+        )
+    finally:
+        if close:
+            conn.close()
+    return df
+
+
+def subset_breakdowns(subset_df):
+    """Summarize the baseline subset for Bob's three questions.
+
+    Returns a dict of DataFrames:
+        samples_per_project    - sample counts per project
+        subjects_by_response   - distinct subject counts (responder/non-resp)
+        subjects_by_sex        - distinct subject counts (male/female)
+    """
+    per_project = (
+        subset_df.groupby("project")["sample"].nunique()
+        .rename("n_samples").reset_index()
+    )
+    by_response = (
+        subset_df.drop_duplicates("subject").groupby("response")["subject"]
+        .nunique().rename("n_subjects").reset_index()
+    )
+    by_sex = (
+        subset_df.drop_duplicates("subject").groupby("sex")["subject"]
+        .nunique().rename("n_subjects").reset_index()
+    )
+    return {
+        "samples_per_project": per_project,
+        "subjects_by_response": by_response,
+        "subjects_by_sex": by_sex,
+    }
+
+
 if __name__ == "__main__":
     freq = cell_frequencies()
 
@@ -220,3 +281,18 @@ if __name__ == "__main__":
     fig_path = "responder_boxplot.png"
     responder_boxplot(rf, outpath=fig_path)
     print(f"Boxplot written to {fig_path}")
+
+    # -- Part 4: baseline subset (melanoma, miraclib, PBMC, day 0) ----------
+    print("\n" + "=" * 70)
+    print("Part 4: baseline subset (melanoma, miraclib, PBMC, time=0)")
+    print("=" * 70)
+    subset = baseline_subset()
+    print(f"Samples: {subset['sample'].nunique():,}  |  "
+          f"Subjects: {subset['subject'].nunique():,}\n")
+    breakdowns = subset_breakdowns(subset)
+    print("Samples per project:")
+    print(breakdowns["samples_per_project"].to_string(index=False))
+    print("\nSubjects by response:")
+    print(breakdowns["subjects_by_response"].to_string(index=False))
+    print("\nSubjects by sex:")
+    print(breakdowns["subjects_by_sex"].to_string(index=False))
