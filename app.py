@@ -87,6 +87,10 @@ server = app.server  # for optional WSGI deployment
 filter_row_style = {"display": "flex", "gap": "24px", "flexWrap": "wrap",
                     "alignItems": "flex-end", "marginBottom": "16px"}
 
+# Each Part 4 chart column shares the row equally and is allowed to shrink
+# (minWidth 0) so all three stay side by side instead of wrapping/overflowing.
+_chart_col_style = {"flex": "1 1 0", "minWidth": 0, "overflow": "hidden"}
+
 
 def labeled(label, component):
     return html.Div([html.Label(label, style={"fontWeight": "bold",
@@ -155,15 +159,19 @@ subset_tab = html.Div([
                                      "marginBottom": "12px"}),
     html.Div([
         html.Div([html.H4("Samples per project"),
-                  dcc.Graph(id="sb-project")],
-                 style={"flex": "1", "minWidth": "300px"}),
+                  dcc.Graph(id="sb-project", style={"height": "320px"},
+                            config={"responsive": True})],
+                 style=_chart_col_style),
         html.Div([html.H4("Subjects by response"),
-                  dcc.Graph(id="sb-response")],
-                 style={"flex": "1", "minWidth": "300px"}),
+                  dcc.Graph(id="sb-response", style={"height": "320px"},
+                            config={"responsive": True})],
+                 style=_chart_col_style),
         html.Div([html.H4("Subjects by sex"),
-                  dcc.Graph(id="sb-sex")],
-                 style={"flex": "1", "minWidth": "300px"}),
-    ], style={"display": "flex", "gap": "16px", "flexWrap": "wrap"}),
+                  dcc.Graph(id="sb-sex", style={"height": "320px"},
+                            config={"responsive": True})],
+                 style=_chart_col_style),
+    ], style={"display": "flex", "gap": "16px", "flexWrap": "nowrap",
+              "width": "100%"}),
 ], style={"padding": "16px"})
 
 
@@ -261,8 +269,11 @@ def update_responders(condition, treatment, sample_type, timepoint):
 def _bar(df, x, y, color):
     fig = px.bar(df, x=x, y=y, text=y)
     fig.update_traces(marker_color=color, textposition="outside")
-    fig.update_layout(margin={"t": 20, "b": 20}, yaxis_title=y,
-                      xaxis_title="", showlegend=False)
+    # autosize lets the figure fill the fixed-height, shrinkable column rather
+    # than imposing Plotly's default ~450px height.
+    fig.update_layout(autosize=True, height=None,
+                      margin={"t": 20, "b": 30, "l": 40, "r": 10},
+                      yaxis_title=y, xaxis_title="", showlegend=False)
     return fig
 
 
