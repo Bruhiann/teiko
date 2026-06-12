@@ -269,11 +269,15 @@ def update_responders(condition, treatment, sample_type, timepoint):
 def _bar(df, x, y, color):
     fig = px.bar(df, x=x, y=y, text=y)
     fig.update_traces(marker_color=color, textposition="outside")
+    # Headroom above the tallest bar so the outside value labels aren't
+    # clipped; computed from the data so it adapts to whatever is returned.
+    y_max = float(df[y].max()) + 150 if not df.empty else 150
     # autosize lets the figure fill the fixed-height, shrinkable column rather
     # than imposing Plotly's default ~450px height.
     fig.update_layout(autosize=True, height=None,
                       margin={"t": 20, "b": 30, "l": 40, "r": 10},
-                      yaxis_title=y, xaxis_title="", showlegend=False)
+                      yaxis_title=y, yaxis_range=[0, y_max],
+                      xaxis_title="", showlegend=False)
     return fig
 
 
