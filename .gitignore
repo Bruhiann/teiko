@@ -3,6 +3,7 @@
 
 # Generated analysis output (recreate with: python analysis.py)
 cell_frequencies.csv
+responder_boxplot.png
 
 # Claude Code local files
 .claude/
