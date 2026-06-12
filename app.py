@@ -107,11 +107,14 @@ overview_tab = html.Div([
     html.P("Each row is one population in one sample: total_count is the sum "
            "across all five populations, and percentage is the population's "
            "share of that total."),
-    html.Div(labeled("Filter by sample id (optional)",
-                     dcc.Input(id="ov-sample", type="text", value="",
-                               placeholder="e.g. sample00000",
-                               style={"width": "220px"}))),
-    html.Br(),
+    html.Div([
+        labeled("Filter by sample id (optional)",
+                dcc.Input(id="ov-sample", type="text", value="",
+                          placeholder="e.g. sample00000",
+                          style={"width": "220px"})),
+        labeled("Population",
+                dropdown("ov-population", ["All"] + POP_ORDER, "All")),
+    ], style=filter_row_style),
     html.Div(id="ov-count", style={"marginBottom": "8px",
                                    "fontStyle": "italic"}),
     dash_table.DataTable(
@@ -227,21 +230,23 @@ app.layout = html.Div([
     Input("ov-table", "page_size"),
     Input("ov-table", "sort_by"),
     Input("ov-sample", "value"),
+    Input("ov-population", "value"),
 )
-def update_overview(page_current, page_size, sort_by, sample_query):
+def update_overview(page_current, page_size, sort_by, sample_query, population):
     page_current = page_current or 0
-    # Changing the filter should reset back to the first page.
+    # Changing either filter should reset back to the first page.
     try:
         triggered = ctx.triggered_id
     except MissingCallbackContextException:  # called outside a live callback
         triggered = None
-    if triggered == "ov-sample":
+    if triggered in ("ov-sample", "ov-population"):
         page_current = 0
 
     page_df, total = analysis.cell_frequencies_page(
         offset=page_current * page_size,
         limit=page_size,
         sample=sample_query,
+        population=population,
         sort_by=sort_by,
         db_path=DB_PATH,
     )

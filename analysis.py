@@ -102,28 +102,43 @@ _FREQ_SORT_SQL = {
 }
 
 
-def cell_frequencies_page(offset=0, limit=50, sample=None, sort_by=None,
-                          conn=None, db_path=DB_PATH):
+def cell_frequencies_page(offset=0, limit=50, sample=None, population=None,
+                          sort_by=None, conn=None, db_path=DB_PATH):
     """Return a single page of the Part 2 frequency table from the database.
 
     Only the requested ``limit`` rows (starting at ``offset``) are read, so the
     full 52,500-row table is never materialized in memory. Returns
     ``(page_df, total_rows)`` where total_rows is the count of rows matching
-    the optional ``sample`` substring filter (for computing page count).
+    the active filters (for computing page count).
+
+    Filters (combine with AND):
+        sample      - substring match on the sample id (None = no filter).
+        population  - exact population name (None/"All" = all populations).
 
     ``sort_by`` is a list of ``{"column_id": str, "direction": "asc"/"desc"}``
     dicts (matching Dash DataTable's sort_by prop); unknown columns are ignored.
 
     Per-sample total_count/percentage stay correct under paging because the
     window function is evaluated over all matching rows before LIMIT/OFFSET.
+    Note: total_count remains the full per-sample total across all five
+    populations even when filtering to one population.
     """
     close = conn is None
     conn = conn or connect(db_path)
     try:
-        where, params = "", []
+        # The sample filter keeps whole samples (all five populations), so it
+        # can apply before the window. The population filter must apply AFTER
+        # the window so total_count stays the full per-sample total rather than
+        # collapsing to the single selected population.
+        inner_where, inner_params = "", []
         if sample:
-            where = "WHERE sample LIKE ?"
-            params.append(f"%{sample.strip()}%")
+            inner_where = "WHERE sample LIKE ?"
+            inner_params.append(f"%{sample.strip()}%")
+
+        outer_where, outer_params = "", []
+        if population and population != "All":
+            outer_where = "WHERE population = ?"
+            outer_params.append(population)
 
         order_terms = []
         for spec in (sort_by or []):
@@ -134,7 +149,7 @@ def cell_frequencies_page(offset=0, limit=50, sample=None, sort_by=None,
         order_by = "ORDER BY " + ", ".join(order_terms) if order_terms \
             else "ORDER BY sample, population"
 
-        query = f"""
+        inner = f"""
             SELECT
                 sample,
                 SUM(count) OVER (PARTITION BY sample)                 AS total_count,
@@ -142,14 +157,22 @@ def cell_frequencies_page(offset=0, limit=50, sample=None, sort_by=None,
                 count,
                 100.0 * count / SUM(count) OVER (PARTITION BY sample) AS percentage
             FROM cell_counts
-            {where}
+            {inner_where}
+        """
+        query = f"""
+            SELECT * FROM ({inner})
+            {outer_where}
             {order_by}
             LIMIT ? OFFSET ?
         """
-        page = pd.read_sql_query(query, conn, params=params + [limit, offset])
+        page = pd.read_sql_query(
+            query, conn,
+            params=inner_params + outer_params + [limit, offset],
+        )
 
         total = conn.execute(
-            f"SELECT COUNT(*) FROM cell_counts {where}", params
+            f"SELECT COUNT(*) FROM ({inner}) {outer_where}",
+            inner_params + outer_params,
         ).fetchone()[0]
     finally:
         if close:
