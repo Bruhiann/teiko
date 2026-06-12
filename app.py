@@ -68,7 +68,6 @@ def data_table(id_, page_size=15):
         id=id_,
         page_size=page_size,
         sort_action="native",
-        filter_action="native",
         # Full-width container so the columns stretch to fill the tab. (The
         # ag-Grid suppressSizeToFit=False behaviour maps to width:100% here,
         # since dash_table.DataTable has no such prop.)
