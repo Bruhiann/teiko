@@ -69,7 +69,10 @@ def data_table(id_, page_size=15):
         page_size=page_size,
         sort_action="native",
         filter_action="native",
-        style_table={"overflowX": "auto"},
+        # Full-width container so the columns stretch to fill the tab. (The
+        # ag-Grid suppressSizeToFit=False behaviour maps to width:100% here,
+        # since dash_table.DataTable has no such prop.)
+        style_table={"width": "100%", "minWidth": "100%", "overflowX": "auto"},
         style_cell={"fontFamily": "sans-serif", "padding": "6px",
                     "textAlign": "left"},
         style_header={"fontWeight": "bold", "backgroundColor": "#f0f2f6"},
