@@ -26,6 +26,33 @@ def connect(db_path=DB_PATH):
     return sqlite3.connect(db_path)
 
 
+def filter_options(conn=None, db_path=DB_PATH):
+    """Return the distinct values available for the dashboard filters.
+
+    Keys: condition, treatment, sample_type, timepoint. Used to populate
+    dropdowns so the UI always reflects what is actually in the database.
+    """
+    close = conn is None
+    conn = conn or connect(db_path)
+    try:
+        def distinct(table, col):
+            rows = conn.execute(
+                f"SELECT DISTINCT {col} FROM {table} "
+                f"WHERE {col} IS NOT NULL ORDER BY {col}"
+            ).fetchall()
+            return [r[0] for r in rows]
+
+        return {
+            "condition": distinct("subjects", "condition"),
+            "treatment": distinct("subjects", "treatment"),
+            "sample_type": distinct("samples", "sample_type"),
+            "timepoint": distinct("samples", "time_from_treatment_start"),
+        }
+    finally:
+        if close:
+            conn.close()
+
+
 # ---------------------------------------------------------------------------
 # Part 2 - Data overview: relative frequency of each population per sample
 # ---------------------------------------------------------------------------
@@ -68,13 +95,15 @@ def cell_frequencies(conn=None, db_path=DB_PATH):
 # ---------------------------------------------------------------------------
 def responder_frequencies(conn=None, db_path=DB_PATH,
                           condition="melanoma", treatment="miraclib",
-                          sample_type="PBMC"):
+                          sample_type="PBMC", timepoint=None):
     """Per-sample population frequencies for the responder comparison subset.
 
     Returns one row per (sample, population) restricted to the given
     condition / treatment / sample_type and to samples whose subject has a
-    known response (yes/no). Columns: sample, subject, response,
-    time_from_treatment_start, population, count, total_count, percentage.
+    known response (yes/no). ``timepoint`` optionally restricts to a single
+    time_from_treatment_start value (None = all timepoints). Columns: sample,
+    subject, response, time_from_treatment_start, population, count,
+    total_count, percentage.
     """
     close = conn is None
     conn = conn or connect(db_path)
@@ -96,11 +125,13 @@ def responder_frequencies(conn=None, db_path=DB_PATH,
               AND su.treatment  = ?
               AND s.sample_type = ?
               AND su.response IN ('yes', 'no')
-            ORDER BY cc.population, su.response, s.sample
         """
-        df = pd.read_sql_query(
-            query, conn, params=(condition, treatment, sample_type)
-        )
+        params = [condition, treatment, sample_type]
+        if timepoint is not None:
+            query += " AND s.time_from_treatment_start = ?"
+            params.append(timepoint)
+        query += " ORDER BY cc.population, su.response, s.sample"
+        df = pd.read_sql_query(query, conn, params=params)
     finally:
         if close:
             conn.close()

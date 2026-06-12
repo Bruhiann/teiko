@@ -8,6 +8,9 @@ responder_boxplot.png
 # Claude Code local files
 .claude/
 
+# Dashboard server log
+server.log
+
 # Python
 __pycache__/
 *.py[cod]
