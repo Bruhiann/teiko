@@ -380,4 +380,7 @@ def update_subset(condition, treatment, sample_type, timepoint):
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # Bind to 0.0.0.0 so the server is reachable through GitHub Codespaces'
+    # forwarded port. PORT is overridable via the environment.
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8050)),
+            debug=False)

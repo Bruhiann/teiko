@@ -1,9 +1,6 @@
-# Generated SQLite database (recreate with: python load_data.py)
+# Generated SQLite database — a binary rebuilt by `make pipeline`
+# (python load_data.py). Not tracked; the CSV/plot outputs below are.
 *.db
-
-# Generated analysis output (recreate with: python analysis.py)
-cell_frequencies.csv
-responder_boxplot.png
 
 # Claude Code local files
 .claude/
