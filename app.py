@@ -24,6 +24,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from dash import Dash, dash_table, dcc, html, Input, Output, ctx
+from dash.dash_table.Format import Format, Scheme
 from dash.exceptions import MissingCallbackContextException
 
 import analysis
@@ -115,9 +116,16 @@ overview_tab = html.Div([
                                    "fontStyle": "italic"}),
     dash_table.DataTable(
         id="ov-table",
-        columns=[{"name": c, "id": c} for c in
-                 ["sample", "total_count", "population", "count",
-                  "percentage"]],
+        columns=[
+            {"name": "sample", "id": "sample"},
+            {"name": "total_count", "id": "total_count"},
+            {"name": "population", "id": "population"},
+            {"name": "count", "id": "count"},
+            # Always show 2 decimal places (e.g. 26.00) for a consistent
+            # column width, while keeping the value numeric for sorting.
+            {"name": "percentage", "id": "percentage", "type": "numeric",
+             "format": Format(precision=2, scheme=Scheme.fixed)},
+        ],
         # Backend pagination + sorting: Dash asks for one page at a time and
         # the callback fetches just those rows from SQLite.
         page_action="custom",
