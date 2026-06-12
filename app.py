@@ -47,13 +47,19 @@ OPTIONS = analysis.filter_options()
 # ---------------------------------------------------------------------------
 # Reusable UI helpers
 # ---------------------------------------------------------------------------
-def dropdown(id_, values, value, clearable=False):
+# Shared control height so text inputs and dropdowns line up on one baseline.
+CONTROL_HEIGHT = "38px"
+INPUT_STYLE = {"width": "220px", "height": CONTROL_HEIGHT,
+               "boxSizing": "border-box"}
+
+
+def dropdown(id_, values, value, clearable=False, width="180px"):
     return dcc.Dropdown(
         id=id_,
         options=[{"label": str(v), "value": v} for v in values],
         value=value,
         clearable=clearable,
-        style={"width": "180px"},
+        style={"width": width, "height": CONTROL_HEIGHT},
     )
 
 
@@ -96,9 +102,12 @@ _chart_col_style = {"flex": "1 1 0", "minWidth": 0, "overflow": "hidden"}
 
 
 def labeled(label, component):
-    return html.Div([html.Label(label, style={"fontWeight": "bold",
-                                               "display": "block"}),
-                     component])
+    return html.Div(
+        [html.Label(label, style={"fontWeight": "bold", "display": "block",
+                                  "marginBottom": "4px"}),
+         component],
+        style={"display": "flex", "flexDirection": "column"},
+    )
 
 
 # ----- Tab 1: Overview (Part 2) --------------------------------------------
@@ -111,7 +120,7 @@ overview_tab = html.Div([
         labeled("Filter by sample id (optional)",
                 dcc.Input(id="ov-sample", type="text", value="",
                           placeholder="e.g. sample00000",
-                          style={"width": "220px"})),
+                          style=INPUT_STYLE)),
         labeled("Population",
                 dropdown("ov-population", ["All"] + POP_ORDER, "All")),
     ], style=filter_row_style),
