@@ -17,12 +17,14 @@ Three tabs map to the analysis tasks:
 All data comes from analysis.py, which queries cell-count.db.
 """
 
+import math
 import os
 
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from dash import Dash, dash_table, dcc, html, Input, Output
+from dash import Dash, dash_table, dcc, html, Input, Output, ctx
+from dash.exceptions import MissingCallbackContextException
 
 import analysis
 
@@ -111,7 +113,24 @@ overview_tab = html.Div([
     html.Br(),
     html.Div(id="ov-count", style={"marginBottom": "8px",
                                    "fontStyle": "italic"}),
-    data_table("ov-table"),
+    dash_table.DataTable(
+        id="ov-table",
+        columns=[{"name": c, "id": c} for c in
+                 ["sample", "total_count", "population", "count",
+                  "percentage"]],
+        # Backend pagination + sorting: Dash asks for one page at a time and
+        # the callback fetches just those rows from SQLite.
+        page_action="custom",
+        page_current=0,
+        page_size=50,
+        sort_action="custom",
+        sort_mode="single",
+        filter_action="none",
+        style_table={"overflowX": "auto"},
+        style_cell={"fontFamily": "sans-serif", "padding": "6px",
+                    "textAlign": "left"},
+        style_header={"fontWeight": "bold", "backgroundColor": "#f0f2f6"},
+    ),
 ], style={"padding": "16px"})
 
 
@@ -193,19 +212,41 @@ app.layout = html.Div([
 # ---------------------------------------------------------------------------
 @app.callback(
     Output("ov-table", "data"),
-    Output("ov-table", "columns"),
+    Output("ov-table", "page_count"),
+    Output("ov-table", "page_current"),
     Output("ov-count", "children"),
+    Input("ov-table", "page_current"),
+    Input("ov-table", "page_size"),
+    Input("ov-table", "sort_by"),
     Input("ov-sample", "value"),
 )
-def update_overview(sample_query):
-    freq = analysis.cell_frequencies(db_path=DB_PATH)
-    if sample_query:
-        freq = freq[freq["sample"].str.contains(sample_query.strip(),
-                                                case=False, na=False)]
-    data, columns = _df_to_records(freq, round_cols=["percentage"])
-    msg = (f"{len(freq):,} rows across {freq['sample'].nunique():,} samples"
-           if len(freq) else "No samples match that filter.")
-    return data, columns, msg
+def update_overview(page_current, page_size, sort_by, sample_query):
+    page_current = page_current or 0
+    # Changing the filter should reset back to the first page.
+    try:
+        triggered = ctx.triggered_id
+    except MissingCallbackContextException:  # called outside a live callback
+        triggered = None
+    if triggered == "ov-sample":
+        page_current = 0
+
+    page_df, total = analysis.cell_frequencies_page(
+        offset=page_current * page_size,
+        limit=page_size,
+        sample=sample_query,
+        sort_by=sort_by,
+        db_path=DB_PATH,
+    )
+    page_df = page_df.round({"percentage": 2})
+
+    page_count = max(1, math.ceil(total / page_size)) if total else 1
+    if total:
+        start = page_current * page_size + 1
+        end = min(start + len(page_df) - 1, total)
+        msg = f"Showing rows {start:,}-{end:,} of {total:,}"
+    else:
+        msg = "No samples match that filter."
+    return page_df.to_dict("records"), page_count, page_current, msg
 
 
 @app.callback(

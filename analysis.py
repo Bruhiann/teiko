@@ -90,6 +90,73 @@ def cell_frequencies(conn=None, db_path=DB_PATH):
     return df
 
 
+# Columns the paginated overview may be sorted by, mapped to the SQL
+# expression to ORDER BY. Whitelisted to keep user-driven sorting injection
+# safe.
+_FREQ_SORT_SQL = {
+    "sample": "sample",
+    "population": "population",
+    "count": "count",
+    "total_count": "SUM(count) OVER (PARTITION BY sample)",
+    "percentage": "100.0 * count / SUM(count) OVER (PARTITION BY sample)",
+}
+
+
+def cell_frequencies_page(offset=0, limit=50, sample=None, sort_by=None,
+                          conn=None, db_path=DB_PATH):
+    """Return a single page of the Part 2 frequency table from the database.
+
+    Only the requested ``limit`` rows (starting at ``offset``) are read, so the
+    full 52,500-row table is never materialized in memory. Returns
+    ``(page_df, total_rows)`` where total_rows is the count of rows matching
+    the optional ``sample`` substring filter (for computing page count).
+
+    ``sort_by`` is a list of ``{"column_id": str, "direction": "asc"/"desc"}``
+    dicts (matching Dash DataTable's sort_by prop); unknown columns are ignored.
+
+    Per-sample total_count/percentage stay correct under paging because the
+    window function is evaluated over all matching rows before LIMIT/OFFSET.
+    """
+    close = conn is None
+    conn = conn or connect(db_path)
+    try:
+        where, params = "", []
+        if sample:
+            where = "WHERE sample LIKE ?"
+            params.append(f"%{sample.strip()}%")
+
+        order_terms = []
+        for spec in (sort_by or []):
+            col = _FREQ_SORT_SQL.get(spec.get("column_id"))
+            if col:
+                direction = "DESC" if spec.get("direction") == "desc" else "ASC"
+                order_terms.append(f"{col} {direction}")
+        order_by = "ORDER BY " + ", ".join(order_terms) if order_terms \
+            else "ORDER BY sample, population"
+
+        query = f"""
+            SELECT
+                sample,
+                SUM(count) OVER (PARTITION BY sample)                 AS total_count,
+                population,
+                count,
+                100.0 * count / SUM(count) OVER (PARTITION BY sample) AS percentage
+            FROM cell_counts
+            {where}
+            {order_by}
+            LIMIT ? OFFSET ?
+        """
+        page = pd.read_sql_query(query, conn, params=params + [limit, offset])
+
+        total = conn.execute(
+            f"SELECT COUNT(*) FROM cell_counts {where}", params
+        ).fetchone()[0]
+    finally:
+        if close:
+            conn.close()
+    return page, total
+
+
 # ---------------------------------------------------------------------------
 # Part 3 - Statistical analysis: responders vs non-responders
 # ---------------------------------------------------------------------------
