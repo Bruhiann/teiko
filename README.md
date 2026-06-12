@@ -31,6 +31,10 @@ if your environment uses a different interpreter.
 
 ### Viewing the dashboard
 
+> **Note:** The dashboard runs locally at **http://localhost:8050** via
+> `make dashboard`. In GitHub Codespaces it's accessible via the forwarded
+> port in the **Ports** tab.
+
 Run `make dashboard`, then open **http://localhost:8050**.
 
 In a Codespace, the server binds to `0.0.0.0:8050`; Codespaces auto-forwards
